@@ -69,7 +69,10 @@ def setup_pinecone(index_name, vectors, text_chunks):
         "values": vector.tolist(),
         "metadata": {"text": text_chunks[i]}
     } for i, vector in enumerate(vectors)]
-    index.upsert(vectors=pine_vectors)
+    # Upsert in batches of 100 to stay under Pinecone's 2MB request limit
+    batch_size = 100
+    for i in range(0, len(pine_vectors), batch_size):
+        index.upsert(vectors=pine_vectors[i : i + batch_size])
     return index
 
 # === QA Answer Generation via OpenRouter ===
