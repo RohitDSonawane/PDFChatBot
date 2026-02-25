@@ -2,16 +2,18 @@ import os
 import fitz  # PyMuPDF
 import streamlit as st
 from dotenv import load_dotenv
+from openai import OpenAI
 from sentence_transformers import SentenceTransformer
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-from transformers import pipeline
 from pinecone import Pinecone, ServerlessSpec
 
 # === ENV Setup ===
 load_dotenv()
 PINECONE_API_KEY = os.getenv("PINECONE_API_KEY")
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 INDEX_NAME = "pdf-qa-chatbot"
 EMBEDDING_MODEL_NAME = "all-MiniLM-L6-v2"
+OPENROUTER_MODEL = "meta-llama/llama-3.1-8b-instruct:free"
 
 # === Streamlit UI Config ===
 st.set_page_config(page_title="📄 PDF ChatBot", layout="wide")
@@ -21,10 +23,6 @@ st.title("📄 Chat with your PDF!")
 @st.cache_resource
 def load_embedder():
     return SentenceTransformer(EMBEDDING_MODEL_NAME)
-
-@st.cache_resource
-def load_qa_pipeline():
-    return pipeline("text2text-generation", model="google/flan-t5-base", max_length=256)
 
 @st.cache_resource
 def connect_pinecone():
@@ -69,14 +67,30 @@ def setup_pinecone(index_name, vectors, text_chunks):
         index = pc.Index(index_name)
     return index
 
-# === QA Answer Generation ===
-def ask_question(index, query, embedder, qa_pipeline):
+# === QA Answer Generation via OpenRouter ===
+def ask_question(index, query, embedder):
     query_vector = embedder.encode([query])[0].tolist()
     results = index.query(vector=query_vector, top_k=5, include_metadata=True)
     context = "\n".join([match["metadata"]["text"] for match in results["matches"]])
-    prompt = f"Answer the question using the context below:\n\n{context}\n\nQuestion: {query}\nAnswer:"
-    result = qa_pipeline(prompt)
-    return result[0]["generated_text"]
+
+    client = OpenAI(
+        base_url="https://openrouter.ai/api/v1",
+        api_key=OPENROUTER_API_KEY,
+    )
+    response = client.chat.completions.create(
+        model=OPENROUTER_MODEL,
+        messages=[
+            {
+                "role": "system",
+                "content": "You are a helpful assistant that answers questions strictly based on the provided PDF context. If the answer is not in the context, say so clearly.",
+            },
+            {
+                "role": "user",
+                "content": f"Context from PDF:\n{context}\n\nQuestion: {query}",
+            },
+        ],
+    )
+    return response.choices[0].message.content
 
 # === Streamlit UI ===
 uploaded_file = st.file_uploader("Upload your PDF", type="pdf")
@@ -91,12 +105,11 @@ if uploaded_file:
         embedder = load_embedder()
         vectors = get_embeddings(chunks, embedder)
         index = setup_pinecone(INDEX_NAME, vectors, chunks)
-        qa_pipeline = load_qa_pipeline()
 
     st.success("✅ PDF Processed! Ask your question below.")
 
     user_input = st.text_input("❓ Ask a question about your PDF:")
     if user_input:
         with st.spinner("💬 Generating answer..."):
-            answer = ask_question(index, user_input, embedder, qa_pipeline)
+            answer = ask_question(index, user_input, embedder)
         st.markdown(f"**Answer:** {answer}")
