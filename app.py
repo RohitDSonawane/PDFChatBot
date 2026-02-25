@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 from openai import OpenAI, RateLimitError
 from sentence_transformers import SentenceTransformer
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-from pinecone import Pinecone, ServerlessSpec
+from pinecone import Pinecone
 
 # Suppress torch/transformers FutureWarnings (cosmetic, no functional impact)
 warnings.filterwarnings("ignore", category=FutureWarning)
@@ -112,6 +112,7 @@ def get_embeddings(chunks, embedder):
 
 # === Pinecone Upload ===
 def setup_pinecone(index_name, vectors, text_chunks):
+    from pinecone import ServerlessSpec  # deferred to avoid Streamlit lazy-import conflict
     pc = connect_pinecone()
     # Create index only if it doesn't exist yet
     if index_name not in [i.name for i in pc.list_indexes()]:
