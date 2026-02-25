@@ -1,0 +1,63 @@
+# ============================================================
+#  PDF ChatBot — .gitignore
+# ============================================================
+
+# ── Secrets & Environment Variables ─────────────────────────
+.env
+.env.local
+.env.*.local
+
+# ── Python Runtime ───────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyo
+*.pyd
+.Python
+
+# ── Virtual Environments ─────────────────────────────────────
+.venv/
+venv/
+env/
+ENV/
+.virtualenv/
+
+# ── Uploaded / Temporary Files ───────────────────────────────
+temp.pdf
+*.tmp
+uploads/
+UPGRADE_PLAN.md
+
+# ── Distribution / Build ─────────────────────────────────────
+build/
+dist/
+*.egg-info/
+*.egg
+.eggs/
+wheels/
+
+# ── Testing ──────────────────────────────────────────────────
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# ── IDEs & Editors ───────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# ── Jupyter Notebooks ────────────────────────────────────────
+.ipynb_checkpoints/
+*.ipynb
+
+# ── Logs ─────────────────────────────────────────────────────
+*.log
+logs/
+
+# ── Streamlit Cache ──────────────────────────────────────────
+.streamlit/secrets.toml
