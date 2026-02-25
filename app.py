@@ -1,9 +1,10 @@
 import os
+import time
 import warnings
 import fitz  # PyMuPDF
 import streamlit as st
 from dotenv import load_dotenv
-from openai import OpenAI
+from openai import OpenAI, RateLimitError
 from sentence_transformers import SentenceTransformer
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from pinecone import Pinecone, ServerlessSpec
@@ -85,20 +86,31 @@ def ask_question(index, query, embedder):
         base_url="https://openrouter.ai/api/v1",
         api_key=OPENROUTER_API_KEY,
     )
-    response = client.chat.completions.create(
-        model=OPENROUTER_MODEL,
-        messages=[
-            {
-                "role": "system",
-                "content": "You are a helpful assistant that answers questions strictly based on the provided PDF context. If the answer is not in the context, say so clearly.",
-            },
-            {
-                "role": "user",
-                "content": f"Context from PDF:\n{context}\n\nQuestion: {query}",
-            },
-        ],
-    )
-    return response.choices[0].message.content
+
+    # Retry up to 3 times with exponential backoff on rate limit errors
+    max_retries = 3
+    for attempt in range(max_retries):
+        try:
+            response = client.chat.completions.create(
+                model=OPENROUTER_MODEL,
+                messages=[
+                    {
+                        "role": "system",
+                        "content": "You are a helpful assistant that answers questions strictly based on the provided PDF context. If the answer is not in the context, say so clearly.",
+                    },
+                    {
+                        "role": "user",
+                        "content": f"Context from PDF:\n{context}\n\nQuestion: {query}",
+                    },
+                ],
+            )
+            return response.choices[0].message.content
+        except RateLimitError:
+            if attempt < max_retries - 1:
+                wait = 2 ** (attempt + 1)  # 2s, 4s, 8s
+                time.sleep(wait)
+            else:
+                raise
 
 # === Streamlit UI ===
 uploaded_file = st.file_uploader("Upload your PDF", type="pdf")
@@ -119,5 +131,13 @@ if uploaded_file:
     user_input = st.text_input("❓ Ask a question about your PDF:")
     if user_input:
         with st.spinner("💬 Generating answer..."):
-            answer = ask_question(index, user_input, embedder)
-        st.markdown(f"**Answer:** {answer}")
+            try:
+                answer = ask_question(index, user_input, embedder)
+                st.markdown(f"**Answer:** {answer}")
+            except RateLimitError:
+                st.warning(
+                    "⚠️ The model is temporarily rate-limited (free tier). "
+                    "Please wait 10–15 seconds and try again."
+                )
+            except Exception as e:
+                st.error(f"❌ Unexpected error: {e}")
