@@ -1,95 +1,162 @@
-# 📄 PDF ChatBot — Chat with Any PDF using AI!
+﻿# PDF ChatBot - Chat with Any PDF using AI
 
 [![Python](https://img.shields.io/badge/Python-3.10+-blue.svg)](https://www.python.org/)
 [![Streamlit](https://img.shields.io/badge/Built%20with-Streamlit-orange)](https://streamlit.io)
+[![Llama](https://img.shields.io/badge/LLM-Llama%203.3%2070B-blueviolet)](https://openrouter.ai)
+[![Pinecone](https://img.shields.io/badge/Vector%20DB-Pinecone-green)](https://pinecone.io)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
-This is a powerful **AI-powered PDF ChatBot** where users can upload any PDF file and ask questions about its content. The app extracts, chunks, embeds the text, stores it in **Pinecone**, and uses **FLAN-T5** to generate smart answers.
+An **AI-powered PDF ChatBot** with a dark chat UI. Upload any PDF, ask questions in a conversational interface, and get grounded answers powered by **Llama 3.3 70B** via OpenRouter.
 
-🚀 Fast, lightweight, and built with love for agentic AI experimentation.
-
----
-
-## ✨ Features
-
-- 📄 Upload & parse PDF using PyMuPDF
-- 🔍 Chunk text and embed with SentenceTransformers
-- 🌲 Store embeddings in Pinecone Vector DB
-- 💬 Ask questions and get answers via FLAN-T5 (Hugging Face)
-- ⚡ Instant UI built with Streamlit
+> Built as a portfolio project - fast, lightweight, zero local GPU required.
 
 ---
 
-## 🧠 Tech Stack
+## Features
 
-- Python 3.10+
-- [Streamlit](https://streamlit.io/)
-- [PyMuPDF](https://pymupdf.readthedocs.io/)
-- [Sentence Transformers](https://www.sbert.net/)
-- [Pinecone Vector DB](https://www.pinecone.io/)
-- [Transformers (FLAN-T5)](https://huggingface.co/docs/transformers/index)
-- [LangChain Text Splitter](https://docs.langchain.com/)
+- Upload & parse any PDF with PyMuPDF
+- Smart text chunking via LangChain
+- Semantic embeddings using `all-MiniLM-L6-v2`
+- Vector storage & retrieval with Pinecone (serverless)
+- Answers from **Llama 3.3 70B** via OpenRouter (free tier)
+- Persistent chat history with full conversation UI
+- Dark GitHub-inspired theme
+- Auto-retry on rate limits, batch upsert for large PDFs
 
 ---
 
-## 📂 Project Structure
+## Architecture
 
-```bash
-pdfchatbot/
-├── app.py             # Main Streamlit application
-├── .env               # Hidden env file for API keys (should NOT be uploaded!)
-├── requirements.txt   # Python dependencies
-└── README.md          # You're reading it!
+```
+PDF Upload
+    |
+    v
+PyMuPDF -- extract raw text
+    |
+    v
+LangChain RecursiveCharacterTextSplitter -- chunk (500 tokens, 50 overlap)
+    |
+    v
+SentenceTransformers all-MiniLM-L6-v2 -- embed chunks -> 384-dim vectors
+    |
+    v
+Pinecone Serverless -- store & query vectors (top-5 retrieval)
+    |
+    v
+OpenRouter -> Llama 3.3 70B Instruct -- generate grounded answer
+    |
+    v
+Streamlit Dark Chat UI -- display in conversation thread
 ```
 
+---
 
-## ⚙️ Setup Instructions
+## Tech Stack
 
-1. **Clone the Repo**
-   ```bash
-   git clone https://github.com/your-username/pdfchatbot.git
-   cd pdfchatbot
-   ```
-   
-2.**Create .env**
-   ```bash
+| Layer              | Technology                                                                                          |
+| ------------------ | --------------------------------------------------------------------------------------------------- |
+| **Frontend**       | [Streamlit](https://streamlit.io/) with custom dark CSS                                             |
+| **PDF Parsing**    | [PyMuPDF](https://pymupdf.readthedocs.io/)                                                          |
+| **Text Splitting** | [LangChain](https://docs.langchain.com/) RecursiveCharacterTextSplitter                             |
+| **Embeddings**     | [SentenceTransformers](https://www.sbert.net/) all-MiniLM-L6-v2                                     |
+| **Vector DB**      | [Pinecone](https://pinecone.io/) Serverless (free tier)                                             |
+| **LLM**            | [Llama 3.3 70B](https://openrouter.ai/meta-llama/llama-3.3-70b-instruct:free) via OpenRouter (free) |
+| **API Client**     | [OpenAI Python SDK](https://github.com/openai/openai-python)                                        |
+
+---
+
+## Project Structure
+
+```
+app/
+├── app.py                  # Streamlit UI entry point
+├── config.py               # All constants (model names, chunk sizes, etc.)
+├── pdf_utils.py            # PDF extraction and text chunking
+├── embedder.py             # SentenceTransformer loading and vector encoding
+├── vector_store.py         # Pinecone connect, upsert, and query
+├── llm.py                  # OpenRouter API call with retry logic
+├── .streamlit/
+│   └── config.toml         # Dark theme + server config for Streamlit Cloud
+├── .env.example            # Template -- copy to .env and fill in keys
+├── .gitignore              # Excludes .env, .venv, temp.pdf, __pycache__
+├── requirements.txt        # Minimal direct dependencies (7 packages)
+└── README.md               # This file
+```
+
+---
+
+## Local Setup
+
+### 1. Clone the repo
+
+```bash
+git clone https://github.com/RohitDSonawane/PDFChatBot.git
+cd PDFChatBot
+```
+
+### 2. Create and activate a virtual environment
+
+```bash
+python -m venv .venv
+# Windows
+.venv\Scripts\activate
+# macOS/Linux
+source .venv/bin/activate
+```
+
+### 3. Install dependencies
+
+```bash
+pip install -r requirements.txt
+```
+
+### 4. Set up environment variables
+
+```bash
+cp .env.example .env
+```
+
+Then edit `.env` and add your keys:
+
+```env
 PINECONE_API_KEY=your-pinecone-api-key
-   ```
+OPENROUTER_API_KEY=your-openrouter-api-key
+```
 
-3.**Install Requirements**
-   ```bash
-pip install -requirements.txt
-   ```
-4.**Set up environment variables**
-Create a .env file in the root directory:
- ```bash
-PINECONE_API_KEY=your_actual_api_key
-   ```
+- Get Pinecone key: [app.pinecone.io](https://app.pinecone.io) -> API Keys
+- Get OpenRouter key (free): [openrouter.ai](https://openrouter.ai) -> Keys
 
-## ▶️ Run the App
-   ```bash
+### 5. Run the app
+
+```bash
 streamlit run app.py
-   ```
+```
 
-## 🧠 How It Works
-1.User uploads a PDF → text is extracted using PyMuPDF
+---
 
-2.Text is chunked using LangChain’s RecursiveCharacterTextSplitter
+## Deploy on Streamlit Community Cloud (Free)
 
-3.Embeddings generated via SentenceTransformers (MiniLM)
+1. Push this repo to GitHub (public)
+2. Go to [share.streamlit.io](https://share.streamlit.io) -> sign in with GitHub
+3. Click **New app** -> select this repo -> set `app.py` as entry point
+4. Go to **Advanced settings -> Secrets** and add:
 
-4.Chunks uploaded to Pinecone
+```toml
+PINECONE_API_KEY = "your-pinecone-api-key"
+OPENROUTER_API_KEY = "your-openrouter-api-key"
+```
 
-5.User enters a question → relevant chunks are retrieved
+5. Click **Deploy** -- live in ~2 minutes
 
-6.Flan-T5 model generates the answer based on context
+---
 
+## Author
 
-## 👨‍💻 Author
-Rohit Sonawane   
-🌐 [LinkedIn-https://www.linkedin.com/in/rohit-sonawane245/]
+**Rohit Sonawane**
 
-## 🌟 Show your support
-⭐️ Star this repo if you like it!   
-💬 Feedback, ideas, or improvements are always welcome.   
-🚀 This is the start of a journey to build crazy agentic AIs.   
+- [LinkedIn](https://www.linkedin.com/in/rohit-sonawane245/)
+- [GitHub](https://github.com/RohitDSonawane)
+
+---
+
+Star this repo if you found it useful! Feedback, issues, and PRs are welcome.
