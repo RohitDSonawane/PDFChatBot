@@ -1,4 +1,5 @@
 import os
+import warnings
 import fitz  # PyMuPDF
 import streamlit as st
 from dotenv import load_dotenv
@@ -7,13 +8,16 @@ from sentence_transformers import SentenceTransformer
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from pinecone import Pinecone, ServerlessSpec
 
+# Suppress torch/transformers FutureWarnings (cosmetic, no functional impact)
+warnings.filterwarnings("ignore", category=FutureWarning)
+
 # === ENV Setup ===
 load_dotenv()
 PINECONE_API_KEY = os.getenv("PINECONE_API_KEY")
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 INDEX_NAME = "pdf-qa-chatbot"
 EMBEDDING_MODEL_NAME = "all-MiniLM-L6-v2"
-OPENROUTER_MODEL = "meta-llama/llama-3.1-8b-instruct:free"
+OPENROUTER_MODEL = "meta-llama/llama-3.3-70b-instruct:free"
 
 # === Streamlit UI Config ===
 st.set_page_config(page_title="📄 PDF ChatBot", layout="wide")
@@ -49,6 +53,7 @@ def get_embeddings(chunks, embedder):
 # === Pinecone Upload ===
 def setup_pinecone(index_name, vectors, text_chunks):
     pc = connect_pinecone()
+    # Create index only if it doesn't exist yet
     if index_name not in [i.name for i in pc.list_indexes()]:
         pc.create_index(
             name=index_name,
@@ -56,15 +61,15 @@ def setup_pinecone(index_name, vectors, text_chunks):
             metric="cosine",
             spec=ServerlessSpec(cloud="aws", region="us-east-1")
         )
-        index = pc.Index(index_name)
-        pine_vectors = [{
-            "id": f"chunk-{i}",
-            "values": vector.tolist(),
-            "metadata": {"text": text_chunks[i]}
-        } for i, vector in enumerate(vectors)]
-        index.upsert(vectors=pine_vectors)
-    else:
-        index = pc.Index(index_name)
+    index = pc.Index(index_name)
+    # Always clear old vectors and upsert fresh ones for the current PDF
+    index.delete(delete_all=True)
+    pine_vectors = [{
+        "id": f"chunk-{i}",
+        "values": vector.tolist(),
+        "metadata": {"text": text_chunks[i]}
+    } for i, vector in enumerate(vectors)]
+    index.upsert(vectors=pine_vectors)
     return index
 
 # === QA Answer Generation via OpenRouter ===
